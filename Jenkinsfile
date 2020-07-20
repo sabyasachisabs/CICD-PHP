@@ -1,11 +1,25 @@
 pipeline {
-    agent { label 'docker' }
-    triggers {
-        bitbucketPush()
-    }
+    agent any
     environment {
-        // Specify your environment variables.
-        APP_VERSION = '1'
+  // Specify your environment variables.
+  APP_VERSION = '1'
+  // This can be nexus3 or nexus2
+  NEXUS_VERSION = "nexus3"
+  // This can be http or https
+  NEXUS_PROTOCOL = "http"
+  // Where your Nexus is running. In my case:
+  NEXUS_URL = "192.168.0.30:8081"
+  // Repository where we will upload the artifact
+  NEXUS_REPOSITORY = "maven-snapshots"
+  // Jenkins credential id to authenticate to Nexus OSS
+  NEXUS_CREDENTIAL_ID = "nexus-credentials"
+  /*
+    Windows: set the ip address of docker host. In my case 192.168.99.100.
+    to obtains this address : $ docker-machine ip
+    Linux: set localhost to SONARQUBE_URL
+  */
+  SONARQUBE_URL = "http://192.168.0.30"
+  SONARQUBE_PORT = "9000"
     }
     stages {
         stage('Build') {
@@ -17,9 +31,9 @@ pipeline {
                 echo 'Install non-dev composer packages and test a symfony cache clear'
                 sh 'docker-compose -f build.yml up --exit-code-from fpm_build --remove-orphans fpm_build'
                 echo 'Building the docker images with the current git commit'
-                sh 'docker build -f Dockerfile-php-production -t registry.example.com/symfony_project_fpm:$GIT_COMMIT .'
-                sh 'docker build -f Dockerfile-nginx -t registry.example.com/symfony_project_nginx:$GIT_COMMIT .'
-                sh 'docker build -f Dockerfile-db -t registry.example.com/symfony_project_db:$GIT_COMMIT .'
+                sh 'docker build -f Dockerfile-php-production -t $NEXUS_URL/symfony_project_fpm:$GIT_COMMIT .'
+                sh 'docker build -f Dockerfile-nginx -t $NEXUS_URL/symfony_project_nginx:$GIT_COMMIT .'
+                sh 'docker build -f Dockerfile-db -t $NEXUS_URL/symfony_project_db:$GIT_COMMIT .'
             }
         }
         stage('Test') {
@@ -36,18 +50,18 @@ pipeline {
             }
             steps {
                 echo 'Deploying docker images'
-                sh 'docker tag registry.example.com/symfony_project_fpm:$GIT_COMMIT registry.example.com/symfony_project_fpm:$APP_VERSION'
-                sh 'docker tag registry.example.com/symfony_project_fpm:$GIT_COMMIT registry.example.com/symfony_project_fpm:latest'
-                sh 'docker push registry.example.com/symfony_project_fpm:$APP_VERSION'
-                sh 'docker push registry.example.com/symfony_project_fpm:latest'
-                sh 'docker tag registry.example.com/symfony_project_nginx:$GIT_COMMIT registry.example.com/symfony_project_nginx:$APP_VERSION'
-                sh 'docker tag registry.example.com/symfony_project_nginx:$GIT_COMMIT registry.example.com/symfony_project_nginx:latest'
-                sh 'docker push registry.example.com/symfony_project_nginx:$APP_VERSION'
-                sh 'docker push registry.example.com/symfony_project_nginx:latest'
-                sh 'docker tag registry.example.com/symfony_project_db:$GIT_COMMIT registry.example.com/symfony_project_db:$APP_VERSION'
-                sh 'docker tag registry.example.com/symfony_project_db:$GIT_COMMIT registry.example.com/symfony_project_db:latest'
-                sh 'docker push registry.example.com/symfony_project_db:$APP_VERSION'
-                sh 'docker push registry.example.com/symfony_project_db:latest'
+                sh 'docker tag $NEXUS_URL/symfony_project_fpm:$GIT_COMMIT $NEXUS_URL/symfony_project_fpm:$APP_VERSION'
+                sh 'docker tag $NEXUS_URL/symfony_project_fpm:$GIT_COMMIT $NEXUS_URL/symfony_project_fpm:latest'
+                sh 'docker push $NEXUS_URL/symfony_project_fpm:$APP_VERSION'
+                sh 'docker push $NEXUS_URL/symfony_project_fpm:latest'
+                sh 'docker tag $NEXUS_URL/symfony_project_nginx:$GIT_COMMIT $NEXUS_URL/symfony_project_nginx:$APP_VERSION'
+                sh 'docker tag $NEXUS_URL/symfony_project_nginx:$GIT_COMMIT $NEXUS_URL/symfony_project_nginx:latest'
+                sh 'docker push $NEXUS_URL/symfony_project_nginx:$APP_VERSION'
+                sh 'docker push $NEXUS_URL/symfony_project_nginx:latest'
+                sh 'docker tag $NEXUS_URL/symfony_project_db:$GIT_COMMIT $NEXUS_URL/symfony_project_db:$APP_VERSION'
+                sh 'docker tag $NEXUS_URL/symfony_project_db:$GIT_COMMIT $NEXUS_URL/symfony_project_db:latest'
+                sh 'docker push $NEXUS_URL/symfony_project_db:$APP_VERSION'
+                sh 'docker push $NEXUS_URL/symfony_project_db:latest'
             }
         }
     }
